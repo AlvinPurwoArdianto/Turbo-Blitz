@@ -10,7 +10,7 @@
 | # | Fitur Baru | Status |
 |---|-----------|--------|
 | 1 | 🔊 Sound Effects (Web Audio API) | ✅ |
-| 2 | 📱 Mobile Controls (Touch Joystick) | ✅ |
+| 2 | 📱 Mobile Controls (Touch Buttons) | ✅ |
 | 3 | 🏆 Leaderboard (localStorage) | ✅ |
 | 4 | 👹 Boss Fight per 5 Wave | ✅ |
 | 5 | 🔫 Weapon Upgrades (4 senjata) | ✅ |
@@ -33,9 +33,13 @@
 | `X` | Tembak ke kanan |
 | `Q` | Ganti senjata (mundur) |
 | `E` | Ganti senjata (maju) |
+| `SFX` | Nyalakan/matikan efek suara |
 
 ### Kontrol Mobile (Layar Sentuh)
-Tombol ◀ ▶ JUMP Z⚡ ⚡X muncul otomatis di bawah layar di perangkat mobile.
+Tombol ◀ Z⚡ JUMP ⚡X ▶ muncul otomatis di bawah layar di perangkat mobile.
+
+- Semua tombol mendukung multi-touch
+- Tidak perlu install apapun — buka di browser mobile langsung
 
 ---
 
@@ -48,7 +52,7 @@ Tombol ◀ ▶ JUMP Z⚡ ⚡X muncul otomatis di bawah layar di perangkat mobile
 | **LASER** | 50 | Sangat cepat | 2 | Peluru kecepatan tinggi |
 | **ROCKET** | 12 | Sangat lambat | 5 + AOE | Ledakan area, damage banyak |
 
-- **Amun habis** → otomatis reload (1.5 detik)
+- **Amun habis** → otomatis reload sekitar 1.5 detik
 - **Pickup senjata** (🔫) bisa muncul dari musuh/power-up
 - **Q/E** untuk ganti senjata kapan saja
 
@@ -85,7 +89,7 @@ Saat level naik, permainan **berhenti sejenak** dan pemain memilih 1 dari 3 kart
 | 🛡️ Armor | Damage yang diterima -25% |
 | 🌀 Spread +15 | Isi ammo Spread +15 |
 | 💎 Score ×1.5 | Semua skor musuh ×1.5 permanen |
-| ⚕️ Regen | HP langsung +20 |
+| ⚕️ Regen | HP +20 saat dipilih |
 
 ---
 
@@ -170,12 +174,16 @@ Di layar sentuh (smartphone/tablet), kontrol virtual muncul otomatis:
 
 ```
 XP Formula:
-  xpNeeded(n+1) = xpNeeded(n) × 1.35  (lebih cepat naik dari v1)
+  xpNeeded(level) = 100 × 1.35^(level-1)
 
 Level Up → Pilih 1 Upgrade Card (baru di v2)
          → Kecepatan jalan +0.25
          → Kecepatan mobil +0.08
 ```
+
+- Kapasitas XP naik setiap level, jadi level berikutnya selalu butuh XP lebih besar dari level sebelumnya.
+- Jika XP yang didapat besar sekaligus, game bisa memproses lebih dari satu level up dalam satu kali reward.
+- Bar XP di HUD selalu mengikuti kapasitas XP terbaru dari level yang sedang aktif.
 
 ---
 

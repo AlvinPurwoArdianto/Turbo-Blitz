@@ -135,11 +135,19 @@
     padding: 4px 8px 6px;
     background: linear-gradient(0deg, rgba(0,0,0,0.7) 0%, transparent 100%);
     display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: stretch;
+  }
+
+  #bars-row {
+    display: flex;
     gap: 6px;
     align-items: flex-end;
   }
 
-  .bar-group { flex: 1; }
+  .bar-group { flex: 1; min-width: 0; }
+  .life-group { width: 100%; }
   .bar-label { font-size: 6px; letter-spacing: 2px; margin-bottom: 2px; }
   .bar-bg { height: 7px; border-radius: 2px; overflow: hidden; border: 1px solid; }
   .bar-fill { height: 100%; border-radius: 2px; transition: width 0.15s; }
@@ -151,6 +159,15 @@
   #xp-label { color: #00ff8877; }
   #xp-bar-bg { background: rgba(0,255,136,0.1); border-color: rgba(0,255,136,0.25); }
   #xp-bar-fill { background: linear-gradient(90deg,#00ff88,#00f5ff); box-shadow: 0 0 6px #00ff88; }
+
+  #lives-label { color: #ff336699; }
+  #hud-lives {
+    color: #ff3366;
+    text-shadow: 0 0 10px #ff3366;
+    font-size: 11px;
+    letter-spacing: 1px;
+    line-height: 1;
+  }
 
   #boss-bar-wrap {
     position: absolute;
@@ -366,6 +383,29 @@
   }
   #controls-bar span { color: #00f5ff33; }
 
+  #btn-sfx {
+    position: absolute;
+    bottom: 34px;
+    right: 8px;
+    z-index: 260;
+    pointer-events: auto;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 8px;
+    letter-spacing: 1px;
+    color: var(--neon-green);
+    background: rgba(0, 20, 10, 0.75);
+    border: 1px solid rgba(0, 255, 136, 0.35);
+    border-radius: 3px;
+    padding: 4px 6px;
+    cursor: pointer;
+  }
+
+  #btn-sfx.off {
+    color: #777;
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(20, 20, 20, 0.7);
+  }
+
   /* MAP THEME for different waves */
   .map-rain { filter: brightness(0.85) saturate(0.7) hue-rotate(200deg); }
   .map-desert { filter: brightness(1.1) saturate(1.4) hue-rotate(-20deg); }
@@ -391,6 +431,7 @@
     <div id="scanlines"></div>
     <div id="corner-tl"></div><div id="corner-tr"></div>
     <div id="corner-bl"></div><div id="corner-br"></div>
+    <button id="btn-sfx" type="button">SFX ON</button>
 
     <!-- HUD -->
     <div id="hud">
@@ -436,13 +477,19 @@
 
       <!-- bottom bars -->
       <div id="hud-bottom">
-        <div class="bar-group">
-          <div class="bar-label" id="hp-label">HP</div>
-          <div class="bar-bg" id="hp-bar-bg"><div class="bar-fill" id="hp-bar-fill" style="width:100%"></div></div>
+        <div class="bar-group life-group">
+          <div class="bar-label" id="lives-label">LIFE</div>
+          <div class="hud-value" id="hud-lives">♥♥♥</div>
         </div>
-        <div class="bar-group">
-          <div class="bar-label" id="xp-label">XP</div>
-          <div class="bar-bg" id="xp-bar-bg"><div class="bar-fill" id="xp-bar-fill" style="width:0%"></div></div>
+        <div id="bars-row">
+          <div class="bar-group">
+            <div class="bar-label" id="hp-label">HP</div>
+            <div class="bar-bg" id="hp-bar-bg"><div class="bar-fill" id="hp-bar-fill" style="width:100%"></div></div>
+          </div>
+          <div class="bar-group">
+            <div class="bar-label" id="xp-label">XP</div>
+            <div class="bar-bg" id="xp-bar-bg"><div class="bar-fill" id="xp-bar-fill" style="width:0%"></div></div>
+          </div>
         </div>
       </div>
     </div>
@@ -528,6 +575,7 @@ let gameState = 'start';
 let score = 0, level = 1, wave = 1;
 let xp = 0, xpNeeded = 100;
 let hp = 100, maxHp = 100;
+let maxLives = 3, lives = 3;
 let frameCount = 0;
 let spawnTimer = 0, spawnInterval = 90;
 let bossActive = false, bossEntity = null;
@@ -539,6 +587,139 @@ let rainDrops = [];
 let reloading = false, reloadTimer = 0;
 let pendingLevelUp = false;
 let gameStartTime = 0;
+const XP_BASE = 100;
+const XP_GROWTH = 1.35;
+
+function getXpNeededForLevel(nextLevel) {
+  return Math.floor(XP_BASE * Math.pow(XP_GROWTH, Math.max(0, nextLevel - 1)));
+}
+
+// ---- AUDIO (Web Audio API) ----
+let audioCtx = null;
+let masterGain = null;
+let sfxEnabled = true;
+
+function initAudio() {
+  if (audioCtx) return;
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return;
+  audioCtx = new AudioCtx();
+  masterGain = audioCtx.createGain();
+  masterGain.gain.value = sfxEnabled ? 0.18 : 0;
+  masterGain.connect(audioCtx.destination);
+}
+
+function ensureAudioReady() {
+  initAudio();
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(() => {});
+  }
+}
+
+function playTone(freq, duration, type='square', volume=0.1, sweepTo=null) {
+  if (!audioCtx || !masterGain || !sfxEnabled) return;
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, now);
+  if (sweepTo !== null) osc.frequency.exponentialRampToValueAtTime(Math.max(20, sweepTo), now + duration);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(volume, now + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+  osc.connect(gain);
+  gain.connect(masterGain);
+  osc.start(now);
+  osc.stop(now + duration + 0.02);
+}
+
+function playNoise(duration=0.08, volume=0.05, highpass=700) {
+  if (!audioCtx || !masterGain || !sfxEnabled) return;
+  const now = audioCtx.currentTime;
+  const len = Math.max(1, Math.floor(audioCtx.sampleRate * duration));
+  const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const src = audioCtx.createBufferSource();
+  const hp = audioCtx.createBiquadFilter();
+  const gain = audioCtx.createGain();
+  hp.type = 'highpass';
+  hp.frequency.value = highpass;
+  gain.gain.setValueAtTime(volume, now);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+  src.buffer = buf;
+  src.connect(hp);
+  hp.connect(gain);
+  gain.connect(masterGain);
+  src.start(now);
+  src.stop(now + duration + 0.02);
+}
+
+function playShootSfx(weaponIdx) {
+  if (weaponIdx === 3) {
+    playTone(120, 0.2, 'sawtooth', 0.14, 55);
+    playNoise(0.12, 0.08, 350);
+    return;
+  }
+  if (weaponIdx === 2) {
+    playTone(1100, 0.07, 'square', 0.06, 700);
+    return;
+  }
+  if (weaponIdx === 1) {
+    playTone(650, 0.09, 'triangle', 0.08, 280);
+    return;
+  }
+  playTone(420, 0.08, 'square', 0.08, 180);
+}
+
+function playHitSfx() {
+  playTone(210, 0.07, 'square', 0.08, 120);
+  playNoise(0.05, 0.04, 600);
+}
+
+function playEnemyDestroyedSfx() {
+  playTone(300, 0.09, 'sawtooth', 0.09, 110);
+}
+
+function playBossDestroyedSfx() {
+  playTone(240, 0.2, 'sawtooth', 0.15, 80);
+  playTone(120, 0.35, 'triangle', 0.12, 50);
+  playNoise(0.2, 0.1, 250);
+}
+
+function playPickupSfx() {
+  playTone(680, 0.06, 'triangle', 0.08, 960);
+}
+
+function playLevelUpSfx() {
+  playTone(440, 0.08, 'triangle', 0.08, 660);
+  playTone(660, 0.12, 'triangle', 0.08, 980);
+}
+
+function playBossAlertSfx() {
+  playTone(200, 0.12, 'square', 0.08, 170);
+  playTone(170, 0.2, 'square', 0.08, 130);
+}
+
+function playGameOverSfx() {
+  playTone(280, 0.16, 'sawtooth', 0.1, 180);
+  playTone(180, 0.22, 'triangle', 0.09, 90);
+}
+
+function playUiBlipSfx() {
+  playTone(880, 0.05, 'triangle', 0.05, 620);
+}
+
+function setSfxEnabled(enabled) {
+  sfxEnabled = enabled;
+  if (masterGain && audioCtx) {
+    masterGain.gain.setTargetAtTime(enabled ? 0.18 : 0, audioCtx.currentTime, 0.02);
+  }
+  const btn = document.getElementById('btn-sfx');
+  if (!btn) return;
+  btn.textContent = enabled ? 'SFX ON' : 'SFX OFF';
+  btn.classList.toggle('off', !enabled);
+}
 
 // Weapons config
 const WEAPONS = [
@@ -689,6 +870,7 @@ function shoot(dir) {
 
   player.shotCooldown = w.cooldown;
   spawnParticles(bx,by,3,w.color,2,10);
+  playShootSfx(currentWeapon);
   updateWeaponHUD();
 }
 
@@ -696,6 +878,7 @@ function startReload() {
   if(reloading || weaponAmmo[currentWeapon] === Infinity) return;
   reloading = true; reloadTimer = 90;
   document.getElementById('weapon-reload').textContent = 'RELOAD...';
+  playTone(170, 0.1, 'square', 0.05, 120);
 }
 
 function enemyShoot(e) {
@@ -737,10 +920,10 @@ function updateComboHUD() {
 // =================================================================
 function gainXP(amount) {
   xp += amount;
-  if(xp >= xpNeeded) {
+  while(xp >= xpNeeded) {
     xp -= xpNeeded;
     level++;
-    xpNeeded = Math.floor(xpNeeded*1.35);
+    xpNeeded = getXpNeededForLevel(level + 1);
     roadSpeed = Math.min(13, roadSpeed+0.25);
     player.speed = Math.min(7.5, player.speed+0.08);
     showLevelUpChoice();
@@ -763,6 +946,7 @@ const UPGRADES = [
 function showLevelUpChoice() {
   if(gameState !== 'playing') return;
   gameState = 'levelup';
+  playLevelUpSfx();
   const screen = document.getElementById('levelup-screen');
   screen.style.display = 'flex';
   const cards = document.getElementById('upgrade-cards');
@@ -776,6 +960,7 @@ function showLevelUpChoice() {
     card.innerHTML = `<div class="icon">${u.icon}</div><div class="name">${u.name}</div><div class="desc">${u.desc.replace('\n','<br>')}</div>`;
     card.addEventListener('click', ()=>{
       u.apply();
+      playUiBlipSfx();
       screen.style.display = 'none';
       gameState = 'playing';
       updateHUD();
@@ -794,6 +979,7 @@ function showBossAnnounce(name) {
   const el = document.getElementById('boss-announce');
   el.innerHTML = `⚠ BOSS MUNCUL ⚠<br><span style="font-size:14px;color:#ff8800">${name}</span>`;
   el.style.opacity = '1';
+  playBossAlertSfx();
   setTimeout(()=>{ el.style.opacity='0'; }, 2500);
 }
 
@@ -816,8 +1002,31 @@ function damagePlayer(dmg) {
   document.getElementById('combo-display').style.opacity = '0';
   updateComboHUD();
   spawnParticles(player.x+player.w/2,player.y+player.h/2,15,'#ff0040',4,30);
+  playHitSfx();
+  if(hp <= 0) {
+    loseLife();
+    return;
+  }
   updateHUD();
-  if(hp <= 0) endGame();
+}
+
+function loseLife() {
+  lives = Math.max(0, lives - 1);
+
+  if(lives <= 0) {
+    updateHUD();
+    endGame();
+    return;
+  }
+
+  // Continue current run without resetting encounter state.
+  hp = maxHp;
+  player.invincible = 120;
+
+  spawnParticles(player.x+player.w/2, player.y+player.h/2, 30, '#ff3366', 6, 35);
+  addFloatText(player.x+player.w/2, player.y-10, `LIFE -1 (${lives}/${maxLives})`, '#ff3366');
+  playTone(190, 0.12, 'square', 0.08, 130);
+  updateHUD();
 }
 
 // =================================================================
@@ -827,6 +1036,7 @@ function updateHUD() {
   document.getElementById('hud-score').textContent = score.toLocaleString();
   document.getElementById('hud-level').textContent = level;
   document.getElementById('hud-wave').textContent = wave;
+  document.getElementById('hud-lives').textContent = '♥'.repeat(lives) + '♡'.repeat(Math.max(0, maxLives-lives));
   document.getElementById('hp-bar-fill').style.width = (hp/maxHp*100)+'%';
   document.getElementById('xp-bar-fill').style.width = (xp/xpNeeded*100)+'%';
   if(bossActive && bossEntity) {
@@ -888,6 +1098,7 @@ function renderLeaderboard() {
 // =================================================================
 function endGame() {
   gameState = 'gameover';
+  playGameOverSfx();
   const hi = getHiScore();
   saveScore(score, level, wave);
   const newHi = getHiScore();
@@ -911,8 +1122,9 @@ function endGame() {
 //  RESET
 // =================================================================
 function resetGame() {
-  score=0; level=1; wave=1; xp=0; xpNeeded=100;
+  score=0; level=1; wave=1; xp=0; xpNeeded=getXpNeededForLevel(2);
   hp=100; maxHp=100; frameCount=0;
+  lives=maxLives;
   spawnTimer=0; spawnInterval=90; roadSpeed=4;
   bossActive=false; bossEntity=null;
   combo=0; comboTimer=0; maxCombo=0;
@@ -1148,6 +1360,7 @@ function update() {
   if((keys['Space']||keys['ArrowUp']||keys['KeyW']) && player.onGround && player.jumpCooldown<=0) {
     player.vy=-12.5; player.onGround=false; player.jumpCooldown=16;
     spawnParticles(player.x+player.w/2,player.y+player.h,8,'#00f5ff',3,20);
+    playTone(260, 0.09, 'triangle', 0.06, 420);
   }
   if(player.jumpCooldown>0) player.jumpCooldown--;
 
@@ -1167,6 +1380,7 @@ function update() {
       const w=WEAPONS[currentWeapon];
       weaponAmmo[currentWeapon]=currentWeapon===1?30:currentWeapon===2?50:12;
       document.getElementById('weapon-reload').textContent='';
+      playTone(540, 0.08, 'triangle', 0.06, 740);
       updateWeaponHUD();
     }
   }
@@ -1229,6 +1443,7 @@ function update() {
         b.currentPhase++;
         b.spd*=1.3;
         spawnParticles(b.x+b.w/2,b.y+b.h/2,25,b.color,7,40);
+        playTone(150, 0.16, 'sawtooth', 0.1, 100);
       }
     }
     // Boss shoot
@@ -1301,6 +1516,7 @@ function update() {
             triggerRocketExplosion(boss.x+boss.w/2,boss.y+boss.h/2,120);
             bossActive=false; bossEntity=null; bossKillCount++;
             document.getElementById('boss-bar-wrap').style.display='none';
+            playBossDestroyedSfx();
             updateHUD();
             addKill();
             // drop multiple powerups
@@ -1326,6 +1542,7 @@ function update() {
               addFloatText(e.x+e.w/2,e.y,`+${gained}`,combo>=3?'#ff6b00':'#ff8800');
               spawnParticles(e.x+e.w/2,e.y+e.h/2,22,e.color,6,38);
               enemies.splice(ei,1);
+              playEnemyDestroyedSfx();
               addKill();
               if(Math.random()<0.1) spawnPowerup(e.x+e.w/2,e.y);
             }
@@ -1377,6 +1594,7 @@ function update() {
     if(p.y>H+30){powerups.splice(pi,1);continue;}
     const pRect={x:player.x,y:player.y,w:player.w,h:player.h};
     if(rectOverlap(pRect,{x:p.x,y:p.y,w:p.w,h:p.h})) {
+      playPickupSfx();
       switch(p.type) {
         case 'hp':     hp=Math.min(maxHp,hp+35); addFloatText(p.x,p.y,'+35 HP','#ff0040'); break;
         case 'xp':     gainXP(50); addFloatText(p.x,p.y,'+50 XP','#00ff88'); break;
@@ -1408,6 +1626,7 @@ function triggerRocketExplosion(x,y,radius) {
   rocketExplosions.push({x,y,radius,life:22,maxLife:22});
   spawnParticles(x,y,25,'#ff8800',7,35,0.05);
   spawnParticles(x,y,10,'#ffcc00',4,20,0.02);
+  playNoise(0.11, 0.09, 220);
 }
 
 function pickUpWeapon(x,y) {
@@ -1417,12 +1636,14 @@ function pickUpWeapon(x,y) {
   currentWeapon=next;
   reloading=false;
   updateWeaponHUD();
+  playPickupSfx();
   addFloatText(x,y,`${WEAPONS[next].name}!`,'#cc44ff');
 }
 
 function cycleWeapon(dir) {
   currentWeapon=(currentWeapon+dir+WEAPONS.length)%WEAPONS.length;
   reloading=false;
+  playUiBlipSfx();
   updateWeaponHUD();
 }
 
@@ -1577,15 +1798,24 @@ document.getElementById('btn-restart').addEventListener('click', ()=>{
   resetGame();
 });
 
+document.getElementById('btn-sfx').addEventListener('click', ()=>{
+  ensureAudioReady();
+  setSfxEnabled(!sfxEnabled);
+  if(sfxEnabled) playUiBlipSfx();
+});
+
 document.getElementById('btn-lb-open').addEventListener('click',()=>{
+  playUiBlipSfx();
   renderLeaderboard();
   document.getElementById('leaderboard-screen').style.display='flex';
 });
 document.getElementById('btn-lb-open2').addEventListener('click',()=>{
+  playUiBlipSfx();
   renderLeaderboard();
   document.getElementById('leaderboard-screen').style.display='flex';
 });
 document.getElementById('btn-lb-back').addEventListener('click',()=>{
+  playUiBlipSfx();
   document.getElementById('leaderboard-screen').style.display='none';
 });
 document.getElementById('btn-lb-clear').addEventListener('click',()=>{
@@ -1595,9 +1825,13 @@ document.getElementById('btn-lb-clear').addEventListener('click',()=>{
   }
 });
 
+document.addEventListener('pointerdown', ensureAudioReady, { once:true });
+document.addEventListener('keydown', ensureAudioReady, { once:true });
+
 setupMobile();
 updateHUD();
 updateWeaponHUD();
+setSfxEnabled(true);
 loop();
 </script>
 </body>
