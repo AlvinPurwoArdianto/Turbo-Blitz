@@ -5,7 +5,7 @@
 
 ## 📋 Deskripsi Game
 
-**TURBO BLITZ: Road Fury v2.0** adalah pengembangan penuh dari v1.0, kini dengan **8 fitur baru** yang diimplementasikan sepenuhnya:
+**TURBO BLITZ: Road Fury v2.0** adalah pengembangan penuh dari v1.0, kini dengan **9 fitur baru** yang diimplementasikan sepenuhnya:
 
 | # | Fitur Baru | Status |
 |---|-----------|--------|
@@ -17,6 +17,7 @@
 | 6 | 🗺️ Map Variety (3 biom) | ✅ |
 | 7 | 🃏 Upgrade Card System (pilih saat level-up) | ✅ |
 | 8 | 🔥 Combo System | ✅ |
+| 9 | ❤️ Life System (3 nyawa) | ✅ |
 
 ---
 
@@ -33,7 +34,8 @@
 | `X` | Tembak ke kanan |
 | `Q` | Ganti senjata (mundur) |
 | `E` | Ganti senjata (maju) |
-| `SFX` | Nyalakan/matikan efek suara |
+
+Efek suara bisa dinyalakan/dimatikan lewat tombol **SFX ON/OFF** di area kanan bawah canvas (di atas bar XP).
 
 ### Kontrol Mobile (Layar Sentuh)
 Tombol ◀ Z⚡ JUMP ⚡X ▶ muncul otomatis di bawah layar di perangkat mobile.
@@ -187,6 +189,15 @@ Level Up → Pilih 1 Upgrade Card (baru di v2)
 
 ---
 
+## ❤️ Sistem Nyawa (3 Life)
+
+- Pemain memiliki **3 nyawa** (indikator hati) di HUD.
+- Saat HP habis, nyawa berkurang 1 lalu permainan **lanjut** (tidak reset dari awal).
+- Saat nyawa tersisa 0, baru masuk ke **Game Over**.
+- Tampilan hati menggunakan format `♥` untuk nyawa aktif dan `♡` untuk nyawa yang sudah habis.
+
+---
+
 ## 🌊 Sistem Wave (Diperbarui)
 
 ```
@@ -206,7 +217,9 @@ Wave 5, 10, 15, 20... → BOSS MUNCUL!
 │                     [WEAPON HUD] │  ← nama senjata + ammo
 │         [BOSS BAR]               │  ← muncul saat boss aktif
 │   ... game canvas ...            │
-│ [HP ████░░] [XP ██░░]            │  ← hud-bottom
+│ [LIFE ♥♥♥]                        │  ← hud-bottom row 1
+│ [HP ████░░] [XP ██░░]            │  ← hud-bottom row 2
+│                    [SFX ON/OFF]  │  ← di atas bar XP
 └──────────────────────────────────┘
 ```
 
@@ -228,6 +241,10 @@ let bossActive = false;
 
 // Combo system
 let combo = 0, comboTimer = 0, maxCombo = 0;
+
+// Life system
+let maxLives = 3, lives = 3;
+function loseLife() {...}
 
 // Map system
 let currentMap = 0; // 0=night, 1=rain, 2=desert
@@ -259,10 +276,10 @@ setupMobile() → touch event listeners
 | Boss | ❌ | ✅ 3 boss, 4 fase |
 | Level-up | Auto | Pilih upgrade card |
 | Leaderboard | ❌ | ✅ 10 best scores |
-| Mobile | ❌ | ✅ virtual joystick |
+| Mobile | ❌ | ✅ virtual buttons |
 | Map | 1 | 3 (malam/hujan/gurun) |
 | Combo | ❌ | ✅ multiplier skor |
-| HUD | 3 kotak | 4 kotak + weapon + boss bar |
+| HUD | 3 kotak | 4 kotak + weapon + boss bar + life + HP/XP row |
 | Ukuran file | ~25 KB | ~57 KB |
 
 ---
