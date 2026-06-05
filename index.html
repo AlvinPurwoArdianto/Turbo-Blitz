@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>TURBO BLITZ: Road Fury v2</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="game-wrapper">
+  <div id="game-title">
+    <h1>TURBO BLITZ <span class="version-badge">v2.0</span></h1>
+    <p>Road Fury &mdash; Drive · Shoot · Level Up · Survive</p>
+  </div>
+
+  <div id="canvas-container">
+    <canvas id="gameCanvas" width="480" height="560"></canvas>
+
+    <div id="scanlines"></div>
+    <div id="corner-tl"></div><div id="corner-tr"></div>
+    <div id="corner-bl"></div><div id="corner-br"></div>
+    <button id="btn-sfx" type="button">SFX ON</button>
+
+    <!-- HUD -->
+    <div id="hud">
+      <div id="hud-top">
+        <div class="hud-box">
+          <div class="hud-label">Score</div>
+          <div class="hud-value" id="hud-score">0</div>
+        </div>
+        <div class="hud-box" style="text-align:center">
+          <div class="hud-label">Level</div>
+          <div class="hud-value" id="hud-level" style="color:#00ff88;text-shadow:0 0 10px #00ff88">1</div>
+        </div>
+        <div class="hud-box" style="text-align:center">
+          <div class="hud-label">Wave</div>
+          <div class="hud-value" id="hud-wave" style="color:#ff6b00;text-shadow:0 0 10px #ff6b00">1</div>
+        </div>
+        <div class="hud-box" style="text-align:right">
+          <div class="hud-label">Combo</div>
+          <div class="hud-value" id="hud-combo" style="color:#cc44ff;text-shadow:0 0 10px #cc44ff">x1</div>
+        </div>
+      </div>
+
+      <div id="weapon-display">
+        <div id="weapon-name">CANNON</div>
+        <div id="weapon-ammo">∞</div>
+        <div id="weapon-reload"></div>
+      </div>
+
+      <div id="combo-display"></div>
+
+      <div id="boss-bar-wrap">
+        <div id="boss-name">⚠ BOSS ⚠</div>
+        <div id="boss-bar-bg"><div id="boss-bar-fill" style="width:100%"></div></div>
+      </div>
+
+      <div id="level-up-msg">⬆ LEVEL UP!</div>
+      <div id="boss-announce"></div>
+
+      <div id="hud-bottom">
+        <div class="bar-group life-group">
+          <div class="bar-label" id="lives-label">LIFE</div>
+          <div class="hud-value" id="hud-lives">♥♥♥</div>
+        </div>
+        <div id="bars-row">
+          <div class="bar-group">
+            <div class="bar-label" id="hp-label">HP</div>
+            <div class="bar-bg" id="hp-bar-bg"><div class="bar-fill" id="hp-bar-fill" style="width:100%"></div></div>
+          </div>
+          <div class="bar-group">
+            <div class="bar-label" id="xp-label">XP</div>
+            <div class="bar-bg" id="xp-bar-bg"><div class="bar-fill" id="xp-bar-fill" style="width:0%"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEADERBOARD SCREEN -->
+    <div id="leaderboard-screen">
+      <h3>🏆 LEADERBOARD</h3>
+      <div id="lb-list"></div>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button class="btn" id="btn-lb-back">KEMBALI</button>
+        <button class="btn btn-red" id="btn-lb-clear">HAPUS DATA</button>
+      </div>
+    </div>
+
+    <!-- LEVEL-UP UPGRADE SCREEN -->
+    <div id="levelup-screen">
+      <h3>⬆ LEVEL UP!</h3>
+      <p>Pilih 1 peningkatan:</p>
+      <div class="upgrade-cards" id="upgrade-cards"></div>
+    </div>
+
+    <!-- START SCREEN -->
+    <div id="start-screen" class="screen">
+      <h2 style="color:var(--neon-cyan)">TURBO BLITZ</h2>
+      <p style="color:var(--neon-orange);font-size:9px;letter-spacing:3px;margin-bottom:3px">ROAD FURY v2.0</p>
+      <p>Tembak musuh, hindari bos, kumpulkan power-up, naiki level — bertahan selama mungkin!</p>
+      <div class="controls-grid">
+        <div><span>← →</span> Gerak kiri/kanan</div>
+        <div><span>SPACE / ↑</span> Lompat</div>
+        <div><span>Z / X</span> Tembak kiri/kanan</div>
+        <div><span>★</span> Power-up & Upgrade</div>
+      </div>
+      <div class="menu-buttons">
+        <button class="btn" id="btn-start">MULAI GAME</button>
+        <button class="btn btn-orange" id="btn-options">PILIHAN</button>
+        <button class="btn btn-red" id="btn-quit">KELUAR</button>
+        <button class="btn btn-orange" id="btn-lb-open">LEADERBOARD</button>
+      </div>
+    </div>
+
+    <!-- OPTIONS SCREEN -->
+    <div id="options-screen" class="screen hidden small">
+      <h2 style="color:var(--neon-orange)">PILIHAN</h2>
+      <p>Atur pengalaman permainan sebelum mulai.</p>
+      <div class="option-list">
+        <div class="option-item">
+          <span>SFX</span>
+          <span id="options-sfx-state" class="option-badge on">ON</span>
+        </div>
+      </div>
+      <div class="menu-buttons">
+        <button class="btn" id="btn-toggle-sfx">TOGGLE SFX</button>
+        <button class="btn btn-orange" id="btn-back-to-menu">KEMBALI</button>
+      </div>
+    </div>
+
+    <!-- QUIT SCREEN -->
+    <div id="quit-screen" class="screen hidden small">
+      <h2 style="color:var(--neon-red)">TERIMA KASIH!</h2>
+      <p>Permainan telah dihentikan. Klik kembali untuk kembali ke menu utama.</p>
+      <div class="menu-buttons">
+        <button class="btn btn-orange" id="btn-back-from-quit">KEMBALI KE MENU</button>
+      </div>
+    </div>
+
+    <!-- GAME OVER SCREEN -->
+    <div id="gameover-screen" class="screen hidden">
+      <h2 style="color:var(--neon-red)">GAME OVER</h2>
+      <p>Mobilmu hancur di jalan raya neraka ini.</p>
+      <div id="score-final">0</div>
+      <p style="font-size:9px;color:#555;margin:0 0 4px;letter-spacing:2px">FINAL SCORE</p>
+      <div id="hi-score-row"></div>
+      <div id="go-stats"></div>
+      <div class="menu-buttons" style="margin-top:10px">
+        <button class="btn btn-orange" id="btn-restart">MAIN LAGI</button>
+        <button class="btn" id="btn-back-home">MENU UTAMA</button>
+        <button class="btn" id="btn-lb-open2">LEADERBOARD</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MOBILE TOUCH CONTROLS -->
+  <div id="mobile-controls">
+    <button class="mobile-btn mb-move" id="mb-left">◀</button>
+    <button class="mobile-btn mb-shoot" id="mb-shoot-l">Z⚡</button>
+    <button class="mobile-btn mb-jump" id="mb-jump">JUMP</button>
+    <button class="mobile-btn mb-shoot" id="mb-shoot-r">⚡X</button>
+    <button class="mobile-btn mb-move" id="mb-right">▶</button>
+  </div>
+
+  <div id="controls-bar">
+    <span>←→ GERAK</span>
+    <span>SPACE LOMPAT</span>
+    <span>Z/X TEMBAK</span>
+    <span>WAVE BOSS setiap 5 wave</span>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
